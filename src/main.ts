@@ -8,7 +8,6 @@ const icons = {
   camera: '<path d="M4 7h4l2-3h4l2 3h4v13H4z"/><circle cx="12" cy="13" r="4"/>',
   image: '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1"/><path d="m3 17 6-6 4 4 3-3 5 5"/>',
   arrow: '<path d="M5 12h14m-5-5 5 5-5 5"/>',
-  shield: '<path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6z"/><path d="m8 12 3 3 5-6"/>',
 };
 function icon(name: keyof typeof icons) { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]}</svg>`; }
 const app = document.querySelector<HTMLDivElement>('#app')!;
@@ -17,14 +16,12 @@ app.innerHTML = `
   <main>
     <section class="winning-panel" aria-labelledby="winning-title"><a class="winning-link" id="official-draw-link" target="_blank" rel="noopener noreferrer"><div class="winning-head"><div><p class="eyebrow" id="draw-context">최근 추첨 결과</p><h2 id="winning-title">당첨번호 조회 중</h2></div><span class="source-pill"><i></i> 동행복권 ↗</span></div><div class="winning-content"><div class="winning-balls" id="winning-balls" aria-label="당첨번호"></div><p id="draw-date" class="draw-date"></p></div></a><p id="data-message" class="data-message" role="status"></p><button id="reload-data" class="text-button" hidden>당첨번호 다시 조회 ↻</button></section>
     <div class="workspace">
-      <section class="scan-panel" aria-labelledby="scan-title"><div class="panel-heading"><span class="step">01</span><h2 id="scan-title">복권 QR 스캔</h2><span class="small-note">당첨확인 QR</span></div>
-        <div class="viewfinder" id="viewfinder"><video id="camera" muted playsinline aria-label="QR 스캔 카메라"></video><div class="viewfinder-content" id="camera-idle"><span class="scanner-illustration">${icon('scan')}</span><h3>당첨확인 QR을 촬영하세요</h3></div><div class="scan-corners" aria-hidden="true"><i></i><i></i><i></i><i></i></div><span class="camera-state" id="camera-state"><i></i> 카메라 대기 중</span></div>
+      <section class="scan-panel" aria-label="복권 QR 스캔">
+        <div class="viewfinder" id="viewfinder" hidden><video id="camera" muted playsinline aria-label="QR 스캔 카메라"></video><div class="scan-corners" aria-hidden="true"><i></i><i></i><i></i><i></i></div><span class="camera-state" id="camera-state"><i></i> QR 인식 중</span></div>
         <button class="button primary" id="start-camera">${icon('camera')}<span>카메라로 스캔하기</span>${icon('arrow')}</button><button class="button secondary" id="upload-button">${icon('image')} 사진에서 QR 읽기</button><input type="file" id="photo" accept="image/*" hidden>
         <p class="scan-message" id="scan-message" role="status" aria-live="polite"></p>
-        <details class="manual-entry"><summary>QR 주소 직접 입력 <span>＋</span></summary><form id="qr-form"><label for="qr-input">QR을 읽었을 때 나온 주소</label><textarea id="qr-input" rows="3" maxlength="500" placeholder="https://qr.dhlottery.co.kr/?v=..."></textarea><button class="button secondary" type="submit">번호 확인하기</button></form></details>
-        <div class="privacy-note">${icon('shield')}<p>QR·사진은 기기에서만 처리됩니다.</p></div>
       </section>
-      <section class="ticket-panel" aria-labelledby="ticket-title"><div class="panel-heading"><span class="step">02</span><h2 id="ticket-title">내 복권 확인</h2><span id="ticket-count" class="small-note">스캔 대기</span></div>
+      <section class="ticket-panel" aria-labelledby="ticket-title"><div class="panel-heading"><h2 id="ticket-title">내 복권 확인</h2><span id="ticket-count" class="small-note">스캔 대기</span></div>
         <div id="ticket-empty" class="ticket-empty"><p>QR을 스캔하면 게임별 번호와<br>당첨 결과가 표시됩니다.</p><button class="demo-button" id="demo">샘플 결과 ${icon('arrow')}</button></div>
         <div id="ticket-result" hidden><div id="result-summary" class="result-summary" aria-live="polite"></div><div class="legend"><span><i class="legend-match">✓</i> 당첨번호 일치</span><span><i class="legend-bonus">+</i> 보너스 일치</span><span id="demo-label" class="demo-label" hidden>샘플 복권</span></div><div id="games" class="games"></div><div class="ticket-bottom"><p id="result-note"></p><button class="button primary" id="next-ticket">${icon('scan')} 다음 복권 스캔 ${icon('arrow')}</button></div></div>
       </section>
@@ -111,8 +108,8 @@ function message(text: string, error = false) {
 function cameraUI(active: boolean) {
   scanActive = active;
   el('viewfinder').classList.toggle('active', active);
-  el('camera-idle').hidden = active;
-  el('camera-state').innerHTML = `<i></i> ${active ? 'QR을 찾고 있어요' : '카메라 대기 중'}`;
+  el('viewfinder').hidden = !active;
+  el('camera-state').innerHTML = '<i></i> QR 인식 중';
   el('start-camera').innerHTML = `${icon('camera')}<span>${active ? '카메라 멈추기' : '카메라로 스캔하기'}</span>${icon('arrow')}`;
 }
 function stopCamera() {
@@ -130,7 +127,7 @@ function readTicket(value: string) {
   ticket = parsed;
   demo = false;
   render();
-  message(`${parsed.round}회 · ${parsed.games.length}게임 인식 완료`);
+  message('');
   if (!database) void loadData();
   if (window.innerWidth < 760) el('winning-title').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -150,6 +147,7 @@ async function startCamera() {
     if (token !== operation || document.hidden) { stream.getTracks().forEach(track => track.stop()); return; }
     prepareCameraVideo(video);
     cameraUI(true);
+    if (window.innerWidth < 760) el('viewfinder').scrollIntoView({ behavior: 'smooth', block: 'center' });
     video.srcObject = stream;
     if (!scanner) scanner = new QrScanner(video, result => {
       if (!scanActive) return;
@@ -166,7 +164,7 @@ async function startCamera() {
   } finally { scanStarting = false; el<HTMLButtonElement>('start-camera').disabled = false; }
 }
 el('start-camera').addEventListener('click', () => void startCamera());
-el('next-ticket').addEventListener('click', () => { el('viewfinder').scrollIntoView({ behavior: 'smooth', block: 'center' }); void startCamera(); });
+el('next-ticket').addEventListener('click', () => { el('start-camera').scrollIntoView({ behavior: 'smooth', block: 'center' }); void startCamera(); });
 el('upload-button').addEventListener('click', () => el<HTMLInputElement>('photo').click());
 el<HTMLInputElement>('photo').addEventListener('change', async event => {
   const input = event.target as HTMLInputElement;
@@ -184,10 +182,6 @@ el<HTMLInputElement>('photo').addEventListener('change', async event => {
     if (token === operation) message(error instanceof Error && !error.message.includes('QR code') ? error.message : 'QR 인식 실패. 선명한 QR 사진을 선택하세요.', true);
   } finally { input.value = ''; el<HTMLButtonElement>('upload-button').disabled = false; }
 });
-el('qr-form').addEventListener('submit', event => {
-  event.preventDefault();
-  try { readTicket(el<HTMLTextAreaElement>('qr-input').value); } catch (error) { message((error as Error).message, true); }
-});
 el('reload-data').addEventListener('click', () => void loadData());
 el('demo').addEventListener('click', () => {
   const draw = database?.draws.at(-1);
@@ -197,7 +191,7 @@ el('demo').addEventListener('click', () => {
   ticket = { round: draw.round, games: [ [...draw.numbers.slice(0, 5), draw.bonus], [...draw.numbers.slice(0, 4), ...rest.slice(0, 2)], [...draw.numbers.slice(0, 3), ...rest.slice(2, 5)], [...draw.numbers.slice(0, 2), ...rest.slice(5, 9)], rest.slice(9, 15) ].map(g => g.sort((a, b) => a - b)) };
   demo = true;
   render();
-  message('샘플 복권');
+  message('');
 });
 // Android's OS permission dialog can hide Chrome while permission is pending.
 document.addEventListener('visibilitychange', () => { if (document.hidden && scanActive) { stopCamera(); message('카메라 중지'); } });

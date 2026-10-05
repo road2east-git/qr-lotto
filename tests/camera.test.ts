@@ -7,7 +7,7 @@ import { requestCamera, prepareCameraVideo, cameraErrorMessage } from '../src/ca
 
 test('preview retains its size after actual QrScanner initialization', async () => {
   const css = await readFile(new URL('../src/style.css', import.meta.url), 'utf8');
-  const dom = new JSDOM(`<style>${css}</style><div class="viewfinder"><video></video></div>`, { pretendToBeVisual: true });
+  const dom = new JSDOM(`<style>${css}</style><div class="viewfinder" hidden><video></video></div>`, { pretendToBeVisual: true });
   const video = dom.window.document.querySelector('video')! as unknown as HTMLVideoElement;
   const keys = ['window', 'document', 'requestAnimationFrame'] as const;
   const originals = keys.map(key => Object.getOwnPropertyDescriptor(globalThis, key));
@@ -18,16 +18,20 @@ test('preview retains its size after actual QrScanner initialization', async () 
     Object.defineProperty(globalThis, 'document', { configurable: true, value: dom.window.document });
     Object.defineProperty(globalThis, 'requestAnimationFrame', { configurable: true, value: dom.window.requestAnimationFrame.bind(dom.window) });
     QrScanner.createQrEngine = async () => ({ postMessage() {} }) as unknown as Worker;
+    assert.equal(dom.window.getComputedStyle(video.parentElement!).display, 'none', 'idle camera must not take up space');
     prepareCameraVideo(video);
+    video.parentElement!.hidden = false;
+    video.parentElement!.classList.add('active');
     scanner = new QrScanner(video, () => {}, { returnDetailedScanResult: true });
     await new Promise<void>(resolve => dom.window.requestAnimationFrame(() => resolve()));
     assert.equal(video.style.width, '100%', 'library must not set video width to 0');
     assert.equal(video.style.height, '100%', 'library must not set video height to 0');
     const computed = dom.window.getComputedStyle(video as unknown as Element);
     assert.equal(computed.display, 'block');
-    assert.equal(computed.opacity, '0', 'idle preview is transparent without display:none');
-    video.parentElement!.classList.add('active');
     assert.equal(dom.window.getComputedStyle(video as unknown as Element).opacity, '1', 'active stream must be visible');
+    video.parentElement!.hidden = true;
+    video.parentElement!.classList.remove('active');
+    assert.equal(dom.window.getComputedStyle(video.parentElement!).display, 'none', 'stopped camera must collapse after scanning');
     assert.equal(video.muted, true);
     assert.equal(video.playsInline, true);
   } finally {
