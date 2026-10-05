@@ -1,4 +1,5 @@
 import QrScanner from 'qr-scanner';
+import { requestCamera, prepareCameraVideo, cameraErrorMessage } from './camera';
 import { type Draw, type DrawDatabase, type Ticket, parseTicket, matchGame, missingDrawState, drawDate, validateDatabase } from './lotto';
 import './style.css';
 
@@ -117,6 +118,10 @@ function cameraUI(active: boolean) {
 function stopCamera() {
   operation++;
   scanner?.stop();
+  const video = el<HTMLVideoElement>('camera');
+  const stream = video.srcObject as MediaStream | null;
+  stream?.getTracks().forEach(track => track.stop());
+  video.srcObject = null;
   cameraUI(false);
 }
 function readTicket(value: string) {
@@ -140,18 +145,24 @@ async function startCamera() {
   el<HTMLButtonElement>('start-camera').disabled = true;
   message('카메라 사용 권한을 허용해주세요.');
   try {
-    if (!scanner) scanner = new QrScanner(el<HTMLVideoElement>('camera'), result => {
+    const video = el<HTMLVideoElement>('camera');
+    const stream = await requestCamera(constraints => navigator.mediaDevices.getUserMedia(constraints));
+    if (token !== operation || document.hidden) { stream.getTracks().forEach(track => track.stop()); return; }
+    prepareCameraVideo(video);
+    cameraUI(true);
+    video.srcObject = stream;
+    if (!scanner) scanner = new QrScanner(video, result => {
       if (!scanActive) return;
       try { readTicket(result.data); } catch (error) { message((error as Error).message, true); }
     }, { preferredCamera: 'environment', maxScansPerSecond: 8, returnDetailedScanResult: true });
+    // Attach our stream so QrScanner does not swallow getUserMedia errors.
     await scanner.start();
-    if (token !== operation) { scanner.stop(); return; }
-    cameraUI(true);
+    if (token !== operation) return;
     message('당첨확인 QR을 네모 안에 맞추세요.');
   } catch (error) {
+    if (token !== operation) return;
     stopCamera();
-    const name = (error as DOMException)?.name;
-    message(name === 'NotAllowedError' ? '카메라 권한이 없습니다. 브라우저 설정에서 허용하거나 사진을 선택하세요.' : name === 'NotFoundError' ? '카메라가 없습니다. 복권 사진을 선택하세요.' : '카메라 실행 실패. 다른 앱의 카메라를 종료하거나 사진을 선택하세요.', true);
+    message(cameraErrorMessage(error), true);
   } finally { scanStarting = false; el<HTMLButtonElement>('start-camera').disabled = false; }
 }
 el('start-camera').addEventListener('click', () => void startCamera());
@@ -188,6 +199,7 @@ el('demo').addEventListener('click', () => {
   render();
   message('샘플 복권');
 });
-document.addEventListener('visibilitychange', () => { if (document.hidden && (scanActive || scanStarting)) { stopCamera(); message('카메라 중지'); } });
+// Android's OS permission dialog can hide Chrome while permission is pending.
+document.addEventListener('visibilitychange', () => { if (document.hidden && scanActive) { stopCamera(); message('카메라 중지'); } });
 window.addEventListener('pagehide', () => { stopCamera(); scanner?.destroy(); scanner = null; });
 void loadData();

@@ -26,6 +26,8 @@ npm run build
 
 카메라는 HTTPS 또는 localhost에서 동작하며 브라우저의 카메라 권한이 필요합니다. 휴대전화에서 HTTP 개발 서버의 LAN 주소에 접속하면 사진 인식만 사용할 수 있습니다.
 
+Android Chrome에서는 사이트 카메라 권한과 Android 설정의 Chrome 앱 카메라 권한이 모두 필요합니다. 카메라 화면은 QR 엔진 초기화 전에 표시할 수 있는 크기로 준비하며, 카메라 선택은 후면·해상도를 필수 조건이 아닌 선호 조건으로 요청합니다. 권한 거부·카메라 사용 중·카메라 없음 오류를 구분해 표시합니다.
+
 ## GitHub Pages
 
 저장소 Settings → Pages → Source를 **GitHub Actions**로 설정합니다. main에 push하면 검사와 빌드 후 배포됩니다. 하위 경로에서도 실행되도록 Vite base는 `./`입니다.
