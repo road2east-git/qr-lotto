@@ -1,0 +1,57 @@
+name: Publish Lotto Lens
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # Saturday 21:15, 22:15, 23:15 KST; daily retry on other days at 09:15 KST.
+    - cron: '15 12,13,14 * * 6'
+    - cron: '15 0 * * 0-5'
+permissions:
+  contents: read
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Refresh official draw data
+        if: github.event_name != 'push'
+        run: npm run data:update
+      - run: npm test
+      - run: npm run build
+      - name: Save refreshed data
+        if: github.event_name != 'push'
+        run: |
+          if ! git diff --quiet -- public/draws.json; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add public/draws.json
+            git commit -m 'Update official lottery draw data'
+            git push
+          fi
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
